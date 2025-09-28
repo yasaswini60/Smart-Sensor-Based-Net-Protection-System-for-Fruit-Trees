@@ -1,234 +1,211 @@
-# System Architecture Documentation
+import React, { useState, useEffect } from 'react';
 
-## Overview
+// === DATA TYPES AND ENUMS ===
+enum NetStatus {
+  Retracted = 'RETRACTED',
+  Deploying = 'DEPLOYING',
+  Deployed = 'DEPLOYED',
+  Retracting = 'RETRACTING',
+  Error = 'ERROR',
+}
 
-The Automated Orchard Fruit Protection System follows a modular, component-based architecture designed for scalability, maintainability, and real-time responsiveness.
-
-## Component Architecture
-
-### 1. Application Layer (App.tsx)
-*Responsibilities:*
-- Central state management for entire system
-- Coordination between all subsystems
-- Real-time simulation engine
-- Event handling and business logic
-
-*Key State Management:*
-typescript
 interface SystemState {
-  windSpeed: number;           // Current wind speed (km/h)
-  windThreshold: number;       // Deployment threshold
-  netStatus: NetStatus;        // Current net state
-  fruitsCollected: number;     // Fruit count
-  batteryLevel: number;        // Power level (%)
-  isOperational: boolean;      // System health
-  lastUpdate: Date;           // Last sensor reading
-  deploymentTime: Date | null; // When net was deployed
-  sustainedWindTime: number;   // High wind duration
+  windSpeed: number;
+  netStatus: NetStatus;
+  fruitsCollected: number;
+  batteryLevel: number;
 }
 
+// === DASHBOARD COMPONENT ===
+const Dashboard: React.FC = () => {
+  const [state, setState] = useState<SystemState>({
+    windSpeed: 5,
+    netStatus: NetStatus.Retracted,
+    fruitsCollected: 0,
+    batteryLevel: 98,
+  });
+  const [alert, setAlert] = useState<string | null>(null);
 
-### 2. Wind Monitoring System (WindMonitor.tsx)
-*Purpose:* Real-time wind speed monitoring and threshold detection
+  const windThreshold = 25; // km/h
 
-*Features:*
-- Continuous anemometer simulation
-- Visual wind speed gauge with color-coded alerts
-- Sustained wind time tracking
-- Threshold breach detection
-- Peak gust recording
+  // Simulate changing wind speed and battery level
+  useEffect(() => {
+    const windInterval = setInterval(() => {
+      setState(prevState => ({
+        ...prevState,
+        // Wind changes randomly, but stays reasonable
+        windSpeed: Math.max(0, Math.min(45, prevState.windSpeed + (Math.random() - 0.5) * 5)),
+        // Battery slowly drains
+        batteryLevel: Math.max(0, prevState.batteryLevel - 0.05),
+      }));
+    }, 2000);
+    return () => clearInterval(windInterval);
+  }, []);
 
-*Algorithm:*
-typescript
-// Wind simulation with realistic fluctuations
-const newWindSpeed = isSimulating 
-  ? Math.max(0, prev.windSpeed + (Math.random() - 0.5) * 8)
-  : Math.max(0, prev.windSpeed + (Math.random() - 0.7) * 5);
+  // Main system logic for net deployment and fruit collection
+  useEffect(() => {
+    // 1. Deploy net if wind is high and it's currently retracted
+    if (state.windSpeed > windThreshold && state.netStatus === NetStatus.Retracted) {
+      setState(prevState => ({ ...prevState, netStatus: NetStatus.Deploying }));
+      setAlert(`CRITICAL WIND ALERT: Wind speed at ${state.windSpeed.toFixed(1)} km/h. Deploying net...`);
+      // Simulate deployment delay
+      setTimeout(() => setState(prevState => ({ ...prevState, netStatus: NetStatus.Deployed })), 3000);
+    }
 
-// Sustained wind detection
-const windAboveThreshold = newWindSpeed >= prev.windThreshold;
-const newSustainedTime = windAboveThreshold 
-  ? prev.sustainedWindTime + 1 
-  : 0;
+    // 2. Retract net if wind subsides and net is deployed
+    if (state.windSpeed < windThreshold - 5 && state.netStatus === NetStatus.Deployed) {
+       handleRetractNet();
+    }
 
+    // 3. Simulate fruit falling when net is deployed
+    if (state.netStatus === NetStatus.Deployed) {
+        const fruitFallInterval = setInterval(() => {
+            setState(prevState => ({
+                ...prevState,
+                fruitsCollected: prevState.fruitsCollected + Math.floor(Math.random() * 3),
+            }));
+        }, 1500);
+        return () => clearInterval(fruitFallInterval); // Cleanup previous interval
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.windSpeed, state.netStatus]); // Only re-run logic when these states change
 
-### 3. Net Control System (NetControl.tsx)
-*Purpose:* Manages radial arm deployment and retraction
+  const handleConfirmCollection = () => {
+    if (state.netStatus !== NetStatus.Deployed) return;
 
-*States:*
-- RETRACTED: Net fully retracted, arms folded
-- DEPLOYING: Arms extending, net unfurling (3s animation)
-- DEPLOYED: Net fully extended and operational
-- RETRACTING: Net folding, arms retracting (2s animation)
-- ERROR: System malfunction detected
+    setAlert(`Collection confirmed. ${Math.floor(state.fruitsCollected)} fruits harvested.`);
+    setState(prevState => ({ ...prevState, fruitsCollected: 0 }));
+    handleRetractNet();
+  };
 
-*Deployment Logic:*
-typescript
-// Auto-deployment after 15 seconds of sustained high wind
-if (newSustainedTime >= 15 && prev.netStatus === 'RETRACTED') {
-  newNetStatus = 'DEPLOYING';
-  deploymentTime = new Date();
-  
-  // Complete deployment after animation
-  setTimeout(() => {
-    setSystemState(current => ({
-      ...current,
-      netStatus: 'DEPLOYED'
-    }));
-  }, 3000);
-}
+  const handleRetractNet = () => {
+     if (state.netStatus !== NetStatus.Deployed) return;
+      setState(prevState => ({ ...prevState, netStatus: NetStatus.Retracting }));
+      setAlert('Wind has subsided. Retracting net...');
+      // Simulate retraction delay
+      setTimeout(() => setState(prevState => ({ ...prevState, netStatus: NetStatus.Retracted, fruitsCollected: 0 })), 3000);
+  }
 
+  // Determine indicator colors
+  const windColor = state.windSpeed > windThreshold ? 'red' : state.windSpeed > windThreshold - 10 ? 'orange' : 'green';
+  const batteryColor = state.batteryLevel < 20 ? 'red' : state.batteryLevel < 40 ? 'orange' : 'green';
+  const netColorMap: Record<NetStatus, string> = {
+    [NetStatus.Retracted]: 'gray',
+    [NetStatus.Deploying]: 'orange',
+    [NetStatus.Deployed]: 'green',
+    [NetStatus.Retracting]: 'orange',
+    [NetStatus.Error]: 'red',
+  };
 
-### 4. Fruit Collection System (FruitCollection.tsx)
-*Purpose:* Tracks and manages fruit collection process
-
-*Features:*
-- Real-time fruit counting
-- Collection basket visualization
-- Weight estimation algorithms
-- Collection efficiency tracking
-- Confirmation workflow
-
-*Collection Algorithm:*
-typescript
-// Simulate fruit collection when net is deployed
-if (newNetStatus === 'DEPLOYED' && windAboveThreshold) {
-  const fruitFall = Math.random() < 0.3 ? Math.floor(Math.random() * 3) + 1 : 0;
-  newFruitsCollected += fruitFall;
-}
-
-
-### 5. Alert Management System (AlertSystem.tsx)
-*Purpose:* Handles all system notifications and farmer communications
-
-*Alert Types:*
-- critical: High wind alerts, system failures
-- warning: Low battery, maintenance needed
-- info: Manual operations, status updates
-- success: Successful collections, completions
-
-*SMS Simulation:*
-typescript
-const deployAlert: Alert = {
-  id: Date.now().toString(),
-  type: 'critical',
-  message: `CRITICAL WIND ALERT: Fruit harvest in progress. Net deployed at Orchard Block A-7. Wind speed: ${newWindSpeed.toFixed(1)} km/h`,
-  timestamp: new Date(),
-  acknowledged: false
+  return (
+    <div>
+      <h1>Automated Orchard Protection System 🍎</h1>
+      <div className="dashboard-grid">
+        <p>Wind Speed: <span style={{ color: windColor, fontWeight: 'bold' }}>{state.windSpeed.toFixed(1)} km/h</span></p>
+        <p>Net Status: <span style={{ color: netColorMap[state.netStatus], fontWeight: 'bold' }}>{state.netStatus}</span></p>
+        <p>Fruits Collected: <span>{Math.floor(state.fruitsCollected)}</span></p>
+        <p>Battery: <span style={{ color: batteryColor, fontWeight: 'bold' }}>{state.batteryLevel.toFixed(1)}%</span></p>
+      </div>
+      {alert && <div className="alert">{alert}</div>}
+      <button onClick={handleConfirmCollection} disabled={state.netStatus !== NetStatus.Deployed || state.fruitsCollected === 0}>
+        {state.netStatus === NetStatus.Deployed ? `Confirm & Retract (${Math.floor(state.fruitsCollected)} Fruits)` : 'Confirm Collection'}
+      </button>
+      <div style={{ marginTop: '20px', fontSize: '14px', color: '#aaa' }}>
+        *Net automatically deploys above {windThreshold} km/h and retracts below {windThreshold - 5} km/h.
+      </div>
+    </div>
+  );
 };
 
-
-### 6. System Status Monitor (SystemStatus.tsx)
-*Purpose:* Monitors system health and operational parameters
-
-*Monitoring Areas:*
-- Battery level and charging status
-- Communication connectivity
-- System operational health
-- Firmware and hardware information
-- Power consumption tracking
-
-## Data Flow Architecture
-
-
-┌─────────────────┐
-│   Sensors       │
-│ - Anemometer    │ ──┐
-│ - Battery       │   │
-│ - Position      │   │
-└─────────────────┘   │
-                      │
-┌─────────────────┐   │    ┌─────────────────┐
-│   Actuators     │   │    │  State Manager  │
-│ - Net Motors    │ ◄─┼────│  (App.tsx)      │
-│ - Collection    │   │    │                 │
-│ - Indicators    │   │    │ - Wind Logic    │
-└─────────────────┘   │    │ - Net Control   │
-                      │    │ - Collection    │
-┌─────────────────┐   │    │ - Alerts        │
-│ Communication   │   │    └─────────────────┘
-│ - SMS Gateway   │ ◄─┘
-│ - Status LED    │
-│ - Web Interface │
-└─────────────────┘
-
-
-## Real-Time Processing
-
-### Update Cycle (1000ms intervals)
-1. *Sensor Reading*: Update wind speed, battery level
-2. *State Evaluation*: Check thresholds and conditions
-3. *Logic Processing*: Apply business rules
-4. *Action Execution*: Deploy/retract net, collect fruit
-5. *Alert Generation*: Create notifications as needed
-6. *UI Update*: Refresh all component displays
-
-### Event-Driven Actions
-- *Wind Threshold Breach*: Immediate deployment sequence
-- *Manual Override*: Instant response to user commands
-- *Collection Confirmation*: Reset counters and update status
-- *Battery Low*: Power management and alerts
-
-## Scalability Considerations
-
-### Multi-Tree Support
-typescript
-interface TreeLocation {
-  id: string;
-  block: string;
-  row: number;
-  position: number;
-  coordinates?: {
-    lat: number;
-    lng: number;
-  };
+// === MAIN APP COMPONENT ===
+function App() {
+  return (
+    <div className="App">
+      <Dashboard />
+      {/* Styles for the entire app */}
+      <style>{`
+        :root {
+          font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+          line-height: 1.5;
+          font-weight: 400;
+          color-scheme: light dark;
+          background-color: #242424;
+        }
+        
+        body {
+          margin: 0;
+          display: flex;
+          place-items: center;
+          min-width: 320px;
+          min-height: 100vh;
+          padding: 20px;
+        }
+        
+        #root {
+          max-width: 800px;
+          margin: 0 auto;
+          padding: 2rem;
+          text-align: center;
+          border: 1px solid #4a4a4a;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        h1 {
+          color: #a0ff80;
+        }
+        
+        .dashboard-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+          margin-bottom: 25px;
+          padding: 15px;
+          border: 1px solid #333;
+          border-radius: 5px;
+          background-color: #1a1a1a;
+        }
+        
+        p {
+          background-color: #333;
+          padding: 10px;
+          border-radius: 4px;
+          margin: 0;
+          text-align: left;
+          color: #fff;
+        }
+        
+        .alert {
+          padding: 10px;
+          margin: 15px 0;
+          background-color: #ffc107;
+          color: #333;
+          border-radius: 4px;
+          font-weight: bold;
+        }
+        
+        button {
+          padding: 10px 20px;
+          font-size: 16px;
+          cursor: pointer;
+          background-color: #4CAF50;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          transition: background-color 0.3s;
+        }
+        
+        button:hover:not(:disabled) {
+          background-color: #45a049;
+        }
+        
+        button:disabled {
+          background-color: #555;
+          cursor: not-allowed;
+        }
+      `}</style>
+    </div>
+  );
 }
 
-
-### Distributed Architecture
-- Each tree unit operates independently
-- Central monitoring dashboard aggregates data
-- Coordinated responses for orchard-wide events
-- Load balancing for communication systems
-
-## Error Handling & Recovery
-
-### Fault Tolerance
-- Graceful degradation when components fail
-- Automatic retry mechanisms for critical operations
-- Fallback modes for essential functions
-- Comprehensive error logging and reporting
-
-### Recovery Procedures
-- Automatic system restart after power loss
-- State persistence across interruptions
-- Manual override capabilities for emergencies
-- Remote diagnostic and repair capabilities
-
-## Security Considerations
-
-### Data Protection
-- Encrypted communication channels
-- Secure authentication for remote access
-- Data integrity verification
-- Privacy protection for farm operations
-
-### System Security
-- Tamper detection and alerts
-- Secure firmware updates
-- Access control and audit logging
-- Network security protocols
-
-## Performance Optimization
-
-### Resource Management
-- Efficient battery usage algorithms
-- Optimized communication protocols
-- Minimal processing overhead
-- Smart caching strategies
-
-### Response Times
-- Sub-second alert generation
-- 3-second maximum deployment time
-- Real-time status updates
-- Immediate manual override response
+export default App;
