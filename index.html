@@ -1,211 +1,344 @@
-import React, { useState, useEffect } from 'react';
-
-// === DATA TYPES AND ENUMS ===
-enum NetStatus {
-  Retracted = 'RETRACTED',
-  Deploying = 'DEPLOYING',
-  Deployed = 'DEPLOYED',
-  Retracting = 'RETRACTING',
-  Error = 'ERROR',
-}
-
-interface SystemState {
-  windSpeed: number;
-  netStatus: NetStatus;
-  fruitsCollected: number;
-  batteryLevel: number;
-}
-
-// === DASHBOARD COMPONENT ===
-const Dashboard: React.FC = () => {
-  const [state, setState] = useState<SystemState>({
-    windSpeed: 5,
-    netStatus: NetStatus.Retracted,
-    fruitsCollected: 0,
-    batteryLevel: 98,
-  });
-  const [alert, setAlert] = useState<string | null>(null);
-
-  const windThreshold = 25; // km/h
-
-  // Simulate changing wind speed and battery level
-  useEffect(() => {
-    const windInterval = setInterval(() => {
-      setState(prevState => ({
-        ...prevState,
-        // Wind changes randomly, but stays reasonable
-        windSpeed: Math.max(0, Math.min(45, prevState.windSpeed + (Math.random() - 0.5) * 5)),
-        // Battery slowly drains
-        batteryLevel: Math.max(0, prevState.batteryLevel - 0.05),
-      }));
-    }, 2000);
-    return () => clearInterval(windInterval);
-  }, []);
-
-  // Main system logic for net deployment and fruit collection
-  useEffect(() => {
-    // 1. Deploy net if wind is high and it's currently retracted
-    if (state.windSpeed > windThreshold && state.netStatus === NetStatus.Retracted) {
-      setState(prevState => ({ ...prevState, netStatus: NetStatus.Deploying }));
-      setAlert(`CRITICAL WIND ALERT: Wind speed at ${state.windSpeed.toFixed(1)} km/h. Deploying net...`);
-      // Simulate deployment delay
-      setTimeout(() => setState(prevState => ({ ...prevState, netStatus: NetStatus.Deployed })), 3000);
-    }
-
-    // 2. Retract net if wind subsides and net is deployed
-    if (state.windSpeed < windThreshold - 5 && state.netStatus === NetStatus.Deployed) {
-       handleRetractNet();
-    }
-
-    // 3. Simulate fruit falling when net is deployed
-    if (state.netStatus === NetStatus.Deployed) {
-        const fruitFallInterval = setInterval(() => {
-            setState(prevState => ({
-                ...prevState,
-                fruitsCollected: prevState.fruitsCollected + Math.floor(Math.random() * 3),
-            }));
-        }, 1500);
-        return () => clearInterval(fruitFallInterval); // Cleanup previous interval
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.windSpeed, state.netStatus]); // Only re-run logic when these states change
-
-  const handleConfirmCollection = () => {
-    if (state.netStatus !== NetStatus.Deployed) return;
-
-    setAlert(`Collection confirmed. ${Math.floor(state.fruitsCollected)} fruits harvested.`);
-    setState(prevState => ({ ...prevState, fruitsCollected: 0 }));
-    handleRetractNet();
-  };
-
-  const handleRetractNet = () => {
-     if (state.netStatus !== NetStatus.Deployed) return;
-      setState(prevState => ({ ...prevState, netStatus: NetStatus.Retracting }));
-      setAlert('Wind has subsided. Retracting net...');
-      // Simulate retraction delay
-      setTimeout(() => setState(prevState => ({ ...prevState, netStatus: NetStatus.Retracted, fruitsCollected: 0 })), 3000);
-  }
-
-  // Determine indicator colors
-  const windColor = state.windSpeed > windThreshold ? 'red' : state.windSpeed > windThreshold - 10 ? 'orange' : 'green';
-  const batteryColor = state.batteryLevel < 20 ? 'red' : state.batteryLevel < 40 ? 'orange' : 'green';
-  const netColorMap: Record<NetStatus, string> = {
-    [NetStatus.Retracted]: 'gray',
-    [NetStatus.Deploying]: 'orange',
-    [NetStatus.Deployed]: 'green',
-    [NetStatus.Retracting]: 'orange',
-    [NetStatus.Error]: 'red',
-  };
-
-  return (
-    <div>
-      <h1>Automated Orchard Protection System 🍎</h1>
-      <div className="dashboard-grid">
-        <p>Wind Speed: <span style={{ color: windColor, fontWeight: 'bold' }}>{state.windSpeed.toFixed(1)} km/h</span></p>
-        <p>Net Status: <span style={{ color: netColorMap[state.netStatus], fontWeight: 'bold' }}>{state.netStatus}</span></p>
-        <p>Fruits Collected: <span>{Math.floor(state.fruitsCollected)}</span></p>
-        <p>Battery: <span style={{ color: batteryColor, fontWeight: 'bold' }}>{state.batteryLevel.toFixed(1)}%</span></p>
-      </div>
-      {alert && <div className="alert">{alert}</div>}
-      <button onClick={handleConfirmCollection} disabled={state.netStatus !== NetStatus.Deployed || state.fruitsCollected === 0}>
-        {state.netStatus === NetStatus.Deployed ? `Confirm & Retract (${Math.floor(state.fruitsCollected)} Fruits)` : 'Confirm Collection'}
-      </button>
-      <div style={{ marginTop: '20px', fontSize: '14px', color: '#aaa' }}>
-        *Net automatically deploys above {windThreshold} km/h and retracts below {windThreshold - 5} km/h.
-      </div>
-    </div>
-  );
-};
-
-// === MAIN APP COMPONENT ===
-function App() {
-  return (
-    <div className="App">
-      <Dashboard />
-      {/* Styles for the entire app */}
-      <style>{`
-        :root {
-          font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-          line-height: 1.5;
-          font-weight: 400;
-          color-scheme: light dark;
-          background-color: #242424;
-        }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orchard System Visual Dashboard</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
         
         body {
-          margin: 0;
-          display: flex;
-          place-items: center;
-          min-width: 320px;
-          min-height: 100vh;
-          padding: 20px;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #121212;
+            color: #e0e0e0;
+            padding: 20px;
         }
-        
-        #root {
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 2rem;
-          text-align: center;
-          border: 1px solid #4a4a4a;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-        
-        h1 {
-          color: #a0ff80;
-        }
-        
-        .dashboard-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 15px;
-          margin-bottom: 25px;
-          padding: 15px;
-          border: 1px solid #333;
-          border-radius: 5px;
-          background-color: #1a1a1a;
-        }
-        
-        p {
-          background-color: #333;
-          padding: 10px;
-          border-radius: 4px;
-          margin: 0;
-          text-align: left;
-          color: #fff;
-        }
-        
-        .alert {
-          padding: 10px;
-          margin: 15px 0;
-          background-color: #ffc107;
-          color: #333;
-          border-radius: 4px;
-          font-weight: bold;
-        }
-        
-        button {
-          padding: 10px 20px;
-          font-size: 16px;
-          cursor: pointer;
-          background-color: #4CAF50;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          transition: background-color 0.3s;
-        }
-        
-        button:hover:not(:disabled) {
-          background-color: #45a049;
-        }
-        
-        button:disabled {
-          background-color: #555;
-          cursor: not-allowed;
-        }
-      `}</style>
-    </div>
-  );
-}
 
-export default App;
+        .dashboard-container {
+            width: 100%;
+            max-width: 900px;
+            background: #1e1e1e;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            padding: 30px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            color: #88ff44;
+            margin-bottom: 10px;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .status-card {
+            background: #2b2b2b;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 150px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .status-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-label {
+            font-size: 1em;
+            color: #b0b0b0;
+            margin-bottom: 10px;
+        }
+
+        .status-value {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: #e0e0e0;
+        }
+
+        /* Wind Gauge styles */
+        .wind-gauge {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: conic-gradient(#4CAF50 0%, #ffc107 50%, #f44336 100%);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 10px;
+        }
+
+        .wind-gauge::before {
+            content: '';
+            width: 85%;
+            height: 85%;
+            background: #1e1e1e;
+            border-radius: 50%;
+            position: absolute;
+        }
+
+        .wind-gauge-needle {
+            position: absolute;
+            width: 2px;
+            height: 45px;
+            background-color: #f44336;
+            transform-origin: bottom;
+            bottom: 50%;
+            left: 50%;
+            transition: transform 0.5s ease-in-out;
+            transform: rotate(-135deg); /* Start position */
+        }
+
+        /* Battery styles */
+        .battery {
+            width: 100px;
+            height: 50px;
+            border: 3px solid #e0e0e0;
+            border-radius: 8px;
+            position: relative;
+            margin: 0 auto 10px;
+        }
+
+        .battery::after {
+            content: '';
+            width: 8px;
+            height: 15px;
+            background: #e0e0e0;
+            position: absolute;
+            top: 50%;
+            right: -11px;
+            transform: translateY(-50%);
+            border-radius: 0 3px 3px 0;
+        }
+
+        .battery-level {
+            height: 100%;
+            background: linear-gradient(to right, #f44336, #ffc107, #4CAF50);
+            border-radius: 5px;
+            transition: width 0.5s;
+        }
+
+        /* Net status styles */
+        .net-status-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        /* Alert styles */
+        .alert {
+            background: #ffc107;
+            color: #1e1e1e;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: 700;
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .alert.show {
+            display: block;
+        }
+        
+        .disclaimer {
+            font-size: 0.85em;
+            color: #b0b0b0;
+            margin-top: 20px;
+        }
+
+        /* General button styles */
+        button {
+            padding: 12px 24px;
+            font-size: 1em;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #45a049;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <h1>Automated Orchard Protection System 🍎</h1>
+    
+    <div class="status-grid">
+        <div class="status-card">
+            <span class="status-label">Wind Speed</span>
+            <div class="wind-gauge">
+                <div class="wind-gauge-needle" id="windNeedle"></div>
+            </div>
+            <span class="status-value" id="windValue">5.0 km/h</span>
+        </div>
+        
+        <div class="status-card">
+            <span class="status-label">Net Status</span>
+            <div class="net-status-icon" id="netIcon"></div>
+            <span class="status-value" id="netStatusValue">RETRACTED</span>
+        </div>
+        
+        <div class="status-card">
+            <span class="status-label">Fruits Collected</span>
+            <span class="status-value" id="fruitsValue">0</span>
+        </div>
+        
+        <div class="status-card">
+            <span class="status-label">Battery Level</span>
+            <div class="battery">
+                <div class="battery-level" id="batteryLevel"></div>
+            </div>
+            <span class="status-value" id="batteryValue">98.0%</span>
+        </div>
+    </div>
+    
+    <div id="alert" class="alert"></div>
+    
+    <button id="confirmBtn">Confirm Collection</button>
+    
+    <div class="disclaimer">
+        *Net automatically deploys above 25 km/h and retracts below 20 km/h.
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const windNeedle = document.getElementById('windNeedle');
+        const windValue = document.getElementById('windValue');
+        const netIcon = document.getElementById('netIcon');
+        const netStatusValue = document.getElementById('netStatusValue');
+        const fruitsValue = document.getElementById('fruitsValue');
+        const batteryLevelEl = document.getElementById('batteryLevel');
+        const batteryValue = document.getElementById('batteryValue');
+        const alertEl = document.getElementById('alert');
+        const confirmBtn = document.getElementById('confirmBtn');
+
+        let state = {
+            windSpeed: 5,
+            netStatus: 'RETRACTED',
+            fruitsCollected: 0,
+            batteryLevel: 98,
+        };
+
+        const windThreshold = 25;
+        const netIcons = {
+            'RETRACTED': '🕸️',
+            'DEPLOYING': '⬇️',
+            'DEPLOYED': '✅',
+            'RETRACTING': '⬆️',
+            'ERROR': '⚠️'
+        };
+
+        const updateUI = () => {
+            windValue.textContent = `${state.windSpeed.toFixed(1)} km/h`;
+            netStatusValue.textContent = state.netStatus;
+            netIcon.textContent = netIcons[state.netStatus];
+            fruitsValue.textContent = Math.floor(state.fruitsCollected);
+            batteryValue.textContent = `${state.batteryLevel.toFixed(1)}%`;
+            batteryLevelEl.style.width = `${state.batteryLevel}%`;
+            
+            // Map wind speed to needle rotation (0-45 km/h maps to -135deg to 135deg)
+            const rotation = (state.windSpeed / 45) * 270 - 135;
+            windNeedle.style.transform = `rotate(${rotation}deg)`;
+
+            // Button state
+            if (state.netStatus === 'DEPLOYED') {
+                confirmBtn.textContent = `Confirm & Retract (${Math.floor(state.fruitsCollected)} Fruits)`;
+                confirmBtn.disabled = state.fruitsCollected === 0;
+            } else {
+                confirmBtn.textContent = 'Confirm Collection';
+                confirmBtn.disabled = true;
+            }
+        };
+
+        const showAlert = (message) => {
+            alertEl.textContent = message;
+            alertEl.classList.add('show');
+            setTimeout(() => {
+                alertEl.classList.remove('show');
+            }, 5000);
+        };
+
+        const handleRetractNet = () => {
+            if (state.netStatus !== 'DEPLOYED') return;
+            state.netStatus = 'RETRACTING';
+            showAlert('Wind has subsided. Retracting net...');
+            updateUI();
+            setTimeout(() => {
+                state.netStatus = 'RETRACTED';
+                state.fruitsCollected = 0;
+                updateUI();
+            }, 3000);
+        };
+
+        confirmBtn.addEventListener('click', () => {
+            if (state.netStatus !== 'DEPLOYED' || state.fruitsCollected === 0) return;
+            showAlert(`Collection confirmed. ${Math.floor(state.fruitsCollected)} fruits harvested.`);
+            state.fruitsCollected = 0;
+            handleRetractNet();
+        });
+
+        setInterval(() => {
+            state.windSpeed = Math.max(0, Math.min(45, state.windSpeed + (Math.random() - 0.5) * 5));
+            state.batteryLevel = Math.max(0, state.batteryLevel - 0.05);
+
+            if (state.windSpeed > windThreshold && state.netStatus === 'RETRACTED') {
+                state.netStatus = 'DEPLOYING';
+                showAlert(`CRITICAL WIND ALERT: Wind speed at ${state.windSpeed.toFixed(1)} km/h. Deploying net...`);
+                setTimeout(() => {
+                    state.netStatus = 'DEPLOYED';
+                    updateUI();
+                }, 3000);
+            } else if (state.windSpeed < windThreshold - 5 && state.netStatus === 'DEPLOYED') {
+                handleRetractNet();
+            }
+
+            if (state.netStatus === 'DEPLOYED') {
+                state.fruitsCollected += Math.floor(Math.random() * 3);
+            }
+            
+            updateUI();
+        }, 2000);
+
+        updateUI();
+    });
+</script>
+
+</body>
+</html>
+
