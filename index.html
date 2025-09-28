@@ -1,0 +1,234 @@
+# System Architecture Documentation
+
+## Overview
+
+The Automated Orchard Fruit Protection System follows a modular, component-based architecture designed for scalability, maintainability, and real-time responsiveness.
+
+## Component Architecture
+
+### 1. Application Layer (App.tsx)
+*Responsibilities:*
+- Central state management for entire system
+- Coordination between all subsystems
+- Real-time simulation engine
+- Event handling and business logic
+
+*Key State Management:*
+typescript
+interface SystemState {
+  windSpeed: number;           // Current wind speed (km/h)
+  windThreshold: number;       // Deployment threshold
+  netStatus: NetStatus;        // Current net state
+  fruitsCollected: number;     // Fruit count
+  batteryLevel: number;        // Power level (%)
+  isOperational: boolean;      // System health
+  lastUpdate: Date;           // Last sensor reading
+  deploymentTime: Date | null; // When net was deployed
+  sustainedWindTime: number;   // High wind duration
+}
+
+
+### 2. Wind Monitoring System (WindMonitor.tsx)
+*Purpose:* Real-time wind speed monitoring and threshold detection
+
+*Features:*
+- Continuous anemometer simulation
+- Visual wind speed gauge with color-coded alerts
+- Sustained wind time tracking
+- Threshold breach detection
+- Peak gust recording
+
+*Algorithm:*
+typescript
+// Wind simulation with realistic fluctuations
+const newWindSpeed = isSimulating 
+  ? Math.max(0, prev.windSpeed + (Math.random() - 0.5) * 8)
+  : Math.max(0, prev.windSpeed + (Math.random() - 0.7) * 5);
+
+// Sustained wind detection
+const windAboveThreshold = newWindSpeed >= prev.windThreshold;
+const newSustainedTime = windAboveThreshold 
+  ? prev.sustainedWindTime + 1 
+  : 0;
+
+
+### 3. Net Control System (NetControl.tsx)
+*Purpose:* Manages radial arm deployment and retraction
+
+*States:*
+- RETRACTED: Net fully retracted, arms folded
+- DEPLOYING: Arms extending, net unfurling (3s animation)
+- DEPLOYED: Net fully extended and operational
+- RETRACTING: Net folding, arms retracting (2s animation)
+- ERROR: System malfunction detected
+
+*Deployment Logic:*
+typescript
+// Auto-deployment after 15 seconds of sustained high wind
+if (newSustainedTime >= 15 && prev.netStatus === 'RETRACTED') {
+  newNetStatus = 'DEPLOYING';
+  deploymentTime = new Date();
+  
+  // Complete deployment after animation
+  setTimeout(() => {
+    setSystemState(current => ({
+      ...current,
+      netStatus: 'DEPLOYED'
+    }));
+  }, 3000);
+}
+
+
+### 4. Fruit Collection System (FruitCollection.tsx)
+*Purpose:* Tracks and manages fruit collection process
+
+*Features:*
+- Real-time fruit counting
+- Collection basket visualization
+- Weight estimation algorithms
+- Collection efficiency tracking
+- Confirmation workflow
+
+*Collection Algorithm:*
+typescript
+// Simulate fruit collection when net is deployed
+if (newNetStatus === 'DEPLOYED' && windAboveThreshold) {
+  const fruitFall = Math.random() < 0.3 ? Math.floor(Math.random() * 3) + 1 : 0;
+  newFruitsCollected += fruitFall;
+}
+
+
+### 5. Alert Management System (AlertSystem.tsx)
+*Purpose:* Handles all system notifications and farmer communications
+
+*Alert Types:*
+- critical: High wind alerts, system failures
+- warning: Low battery, maintenance needed
+- info: Manual operations, status updates
+- success: Successful collections, completions
+
+*SMS Simulation:*
+typescript
+const deployAlert: Alert = {
+  id: Date.now().toString(),
+  type: 'critical',
+  message: `CRITICAL WIND ALERT: Fruit harvest in progress. Net deployed at Orchard Block A-7. Wind speed: ${newWindSpeed.toFixed(1)} km/h`,
+  timestamp: new Date(),
+  acknowledged: false
+};
+
+
+### 6. System Status Monitor (SystemStatus.tsx)
+*Purpose:* Monitors system health and operational parameters
+
+*Monitoring Areas:*
+- Battery level and charging status
+- Communication connectivity
+- System operational health
+- Firmware and hardware information
+- Power consumption tracking
+
+## Data Flow Architecture
+
+
+┌─────────────────┐
+│   Sensors       │
+│ - Anemometer    │ ──┐
+│ - Battery       │   │
+│ - Position      │   │
+└─────────────────┘   │
+                      │
+┌─────────────────┐   │    ┌─────────────────┐
+│   Actuators     │   │    │  State Manager  │
+│ - Net Motors    │ ◄─┼────│  (App.tsx)      │
+│ - Collection    │   │    │                 │
+│ - Indicators    │   │    │ - Wind Logic    │
+└─────────────────┘   │    │ - Net Control   │
+                      │    │ - Collection    │
+┌─────────────────┐   │    │ - Alerts        │
+│ Communication   │   │    └─────────────────┘
+│ - SMS Gateway   │ ◄─┘
+│ - Status LED    │
+│ - Web Interface │
+└─────────────────┘
+
+
+## Real-Time Processing
+
+### Update Cycle (1000ms intervals)
+1. *Sensor Reading*: Update wind speed, battery level
+2. *State Evaluation*: Check thresholds and conditions
+3. *Logic Processing*: Apply business rules
+4. *Action Execution*: Deploy/retract net, collect fruit
+5. *Alert Generation*: Create notifications as needed
+6. *UI Update*: Refresh all component displays
+
+### Event-Driven Actions
+- *Wind Threshold Breach*: Immediate deployment sequence
+- *Manual Override*: Instant response to user commands
+- *Collection Confirmation*: Reset counters and update status
+- *Battery Low*: Power management and alerts
+
+## Scalability Considerations
+
+### Multi-Tree Support
+typescript
+interface TreeLocation {
+  id: string;
+  block: string;
+  row: number;
+  position: number;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+}
+
+
+### Distributed Architecture
+- Each tree unit operates independently
+- Central monitoring dashboard aggregates data
+- Coordinated responses for orchard-wide events
+- Load balancing for communication systems
+
+## Error Handling & Recovery
+
+### Fault Tolerance
+- Graceful degradation when components fail
+- Automatic retry mechanisms for critical operations
+- Fallback modes for essential functions
+- Comprehensive error logging and reporting
+
+### Recovery Procedures
+- Automatic system restart after power loss
+- State persistence across interruptions
+- Manual override capabilities for emergencies
+- Remote diagnostic and repair capabilities
+
+## Security Considerations
+
+### Data Protection
+- Encrypted communication channels
+- Secure authentication for remote access
+- Data integrity verification
+- Privacy protection for farm operations
+
+### System Security
+- Tamper detection and alerts
+- Secure firmware updates
+- Access control and audit logging
+- Network security protocols
+
+## Performance Optimization
+
+### Resource Management
+- Efficient battery usage algorithms
+- Optimized communication protocols
+- Minimal processing overhead
+- Smart caching strategies
+
+### Response Times
+- Sub-second alert generation
+- 3-second maximum deployment time
+- Real-time status updates
+- Immediate manual override response
